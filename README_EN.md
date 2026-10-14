@@ -21,6 +21,20 @@ Not included:
 
 ## Environment
 
+Python 3.10 or newer is required. If you do not have a training environment to reuse, create a virtual environment in this directory and install all dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Run `source .venv/bin/activate` again in each new terminal.
+
+If `PYTHONPATH` adds ROS or other environments' packages, use `python -E` instead of `python`/`python3` below to ignore Python environment variables and use the active virtual environment's dependencies.
+
+To reproduce the validated dependency versions, install `requirements-lock.txt` instead of `requirements.txt` (validated on Linux x86_64 with Python 3.11).
+
 Reuse the conda environment that you already use for training and policy export.
 
 ```bash
@@ -52,6 +66,18 @@ Check the dependencies:
 python -c "import mujoco, onnxruntime; print('MuJoCo:', mujoco.__version__)"
 ```
 
+Check the configuration without opening a viewer:
+
+```bash
+python check_config.py --task parkour
+# Also check depth rendering; requires working OpenGL/display access
+python check_config.py --task parkour --render
+```
+
+This checks dependencies, scene/mesh loading, joint and sensor order, camera configuration, and ONNX interfaces with one inference. Missing policies are reported with their paths and a nonzero exit code. A successful interface check still requires simulation to confirm policy behavior and matching training parameters.
+
+Linux/WSL desktop runs can use the default GLFW backend with an accessible `DISPLAY`. On WSL, use `glxinfo -B` to check WSLg/OpenGL.
+
 ## Quick Start
 
 Place the required ONNX model files first. See "Preparing ONNX Policies".
@@ -61,6 +87,16 @@ Run the parkour policy:
 ```bash
 python3 sim2sim.py --task parkour
 ```
+
+Startup prints the Python executable and MuJoCo's actual OpenGL renderer. A renderer containing `NVIDIA` uses the NVIDIA GPU; `llvmpipe` or `softpipe` indicates software rendering.
+
+For slow runs, enable stage timings:
+
+```bash
+python3 sim2sim.py --task parkour --profile
+```
+
+Every two seconds, this reports the control rate and depth rendering, preprocessing, ONNX inference, physics, and viewer synchronization timings. Control rate differs from window display FPS; the default control target is 50 Hz.
 
 Run the stand policy:
 

@@ -1,4 +1,5 @@
 import os
+import time
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -20,14 +21,24 @@ class DepthImageRender:
         self._render = mujoco.Renderer(model, height, width)
         self._render.enable_depth_rendering()
         self._data = np.zeros((height, width), dtype=np.float32)
+        self.last_render_ms = 0.0
+
+        # Query the active MuJoCo context, rather than a separate glxinfo context.
+        from OpenGL import GL
+        renderer = GL.glGetString(GL.GL_RENDERER)
+        self.gl_renderer = renderer.decode() if renderer else "unknown"
+        print(f"MuJoCo OpenGL renderer: {self.gl_renderer}")
+        print(f"Depth render resolution: {width}x{height}")
 
     def render(self, model_data_lock=None) -> np.ndarray:
+        start = time.perf_counter()
         if model_data_lock is not None:
             with model_data_lock:
                 self._render.update_scene(self._model_data, self._camera_name)
         else:
             self._render.update_scene(self._model_data, self._camera_name)
         self._render.render(out=self._data)
+        self.last_render_ms = (time.perf_counter() - start) * 1000
         return self._data
 
 class MujocoEnv:

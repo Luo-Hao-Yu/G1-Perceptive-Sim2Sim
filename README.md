@@ -21,6 +21,20 @@
 
 ## 环境依赖
 
+需要 Python 3.10 或更高版本。如果没有可复用的训练环境，可以在项目目录创建虚拟环境并安装全部依赖：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+每次打开新终端后，先执行 `source .venv/bin/activate`。
+
+如果终端的 `PYTHONPATH` 引入了 ROS 或其他环境的包，可使用 `python -E` 替代下面命令中的 `python`/`python3`，忽略 Python 环境变量，确保使用当前虚拟环境的依赖。
+
+要复现本次验证的依赖版本，可将安装命令中的 `requirements.txt` 替换为 `requirements-lock.txt`（在 Linux x86_64、Python 3.11 环境验证）。
+
 建议直接复用你已经用于训练和策略导出的 conda 环境。
 
 ```bash
@@ -52,6 +66,18 @@ python -m pip install onnxruntime
 python -c "import mujoco, onnxruntime; print('MuJoCo:', mujoco.__version__)"
 ```
 
+完整配置检查（无需打开窗口）：
+
+```bash
+python check_config.py --task parkour
+# 同时检查深度渲染，需要可用的 OpenGL/显示服务
+python check_config.py --task parkour --render
+```
+
+检查包括依赖、场景和 mesh 加载、关节/传感器顺序、相机以及 ONNX 输入输出和一次推理。缺少策略文件时会列出路径并返回非零退出码。接口检查通过后，仍需用实际仿真确认策略行为及训练参数是否匹配。
+
+Linux/WSL 桌面运行使用默认 GLFW 后端即可；需要能连接 `DISPLAY` 指向的显示服务。WSL 可用 `glxinfo -B` 检查 WSLg/OpenGL。
+
 ## 快速开始
 
 运行前请先按“准备 ONNX 策略”放置对应模型文件。
@@ -61,6 +87,16 @@ python -c "import mujoco, onnxruntime; print('MuJoCo:', mujoco.__version__)"
 ```bash
 python3 sim2sim.py --task parkour
 ```
+
+启动时会打印 Python 路径和 MuJoCo 实际 OpenGL 渲染设备。设备名称含 `NVIDIA` 表示使用 NVIDIA 显卡；`llvmpipe` 或 `softpipe` 表示软件渲染。
+
+出现卡顿时，启用分阶段耗时统计：
+
+```bash
+python3 sim2sim.py --task parkour --profile
+```
+
+每两秒输出控制循环频率及深度渲染、预处理、ONNX 推理、物理仿真和查看器同步耗时。控制循环频率与窗口显示帧率不同；默认控制目标为 50 Hz。
 
 运行站立 policy：
 

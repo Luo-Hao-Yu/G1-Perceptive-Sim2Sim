@@ -142,7 +142,8 @@
           <joint name="waist_roll_joint" pos="0 0 0" axis="1 0 0" range="-0.52 0.52" actuatorfrcrange="-50 50"/>
           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.7 0.7 0.7 1" mesh="waist_roll_link"/>
           <body name="torso_link">
-            <camera name="depth_camera" pos="0.04764571478 0 0.40868178553" euler="0 -0.7330382858376184 -1.57" mode="fixed" fovy="58.29"/>
+            <!-- Training camera extrinsics converted to OpenGL axes: +X right, +Y up, -Z forward. -->
+            <camera name="depth_camera" pos="0.0487988662332928 0.01 0.4378029937970051" quat="0.65795401141687793 0.25558131128651446 -0.25121800887314166 -0.66231731383025083" mode="fixed" fovy="58.29"/>
             <inertial pos="0.00203158 0.000339683 0.184568" quat="0.999803 -6.03319e-05 0.0198256 0.00131986" mass="7.818" diaginertia="0.121847 0.109825 0.0273735"/>
             <joint name="waist_pitch_joint" pos="0 0 0" axis="0 1 0" range="-0.52 0.52" actuatorfrcrange="-50 50"/>
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.7 0.7 0.7 1" mesh="torso_link"/>
