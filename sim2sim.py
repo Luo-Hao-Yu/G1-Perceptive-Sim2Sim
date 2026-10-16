@@ -18,6 +18,7 @@ sys.path.append(os.path.dirname(__file__))
 from mujoco_env import MujocoEnv
 from config import *
 from onnx_inference import OnnxPolicyInference as Inference
+from heading_control import HeadingHold, heading_from_matrix
 
 def key(name: str, fallback: int) -> int:
     if glfw is None:
@@ -158,8 +159,19 @@ class DepthImagePipeline:
         return obs
 
 class Sim2simInstance:
-    def __init__(self, sim2sim_type: Literal["stand", "parkour"]):
+    def __init__(self, sim2sim_type: Literal["stand", "parkour"], control: Literal["keyboard", "gamepad"] = "keyboard", gamepad_id: int | None = None):
+        if control not in ("keyboard", "gamepad"):
+            raise ValueError(f"Unsupported control mode: {control}")
+        if control == "gamepad" and sim2sim_type != "parkour":
+            raise ValueError("Gamepad velocity control is only available for the parkour task")
         self.sim2sim_type = sim2sim_type
+        self.control_mode = control
+        self.gamepad = None
+        self.heading_hold = None
+        self._reset_requested = False
+        if control == "gamepad":
+            from gamepad_control import GamepadController
+            self.gamepad = GamepadController(gamepad_id)
         self.velocity_commands = self._default_velocity_commands()
 
         policy_files = (
@@ -219,6 +231,10 @@ class Sim2simInstance:
         self.torque_limit = np.array(TORQUE_LIMITS)[self.policy_to_robot]
 
         self.last_action = np.zeros((29,), dtype=np.float32)
+        self.effective_velocity_commands = np.zeros(3, dtype=np.float32)
+        if sim2sim_type == "parkour" and HEADING_HOLD_ENABLED:
+            self._heading_body_id = self.sim_env.model.body(HEADING_HOLD_BODY).id
+            self.heading_hold = HeadingHold(HEADING_HOLD_GAIN, HEADING_HOLD_MAX_YAW_RATE, COMMAND_RANGES["ang_vel_z"])
 
         if self.sim2sim_type == "stand":
             self.actor = Inference(STAND_POLICY_FILE)
@@ -235,25 +251,53 @@ class Sim2simInstance:
     def _print_keyboard_help(self):
         if self.sim2sim_type != "parkour":
             return
-        print("Keyboard: Up/Down or KP8/KP2 vx, Left/Right or KP4/KP6 yaw, " "Space/KP5 stop, R reset.")
+        if self.gamepad is not None:
+            print("Gamepad: left stick up = forward, right stick left/right = yaw; B = stop, Y = reset. Release sticks to stop. Center sticks after connection/stop/reset.")
+            print("Keyboard in gamepad mode: Space/KP5 stop, R reset. Use --control keyboard for arrow-key velocity control.")
+        else:
+            print("Keyboard: Up/Down or KP8/KP2 vx, Left/Right or KP4/KP6 yaw, Space/KP5 stop, R reset.")
+        if self.heading_hold is not None:
+            print("Heading hold: zero manual yaw holds the reset/last turning direction; manual yaw input takes priority.")
         print(f"Initial velocity command: {self.velocity_commands.tolist()}")
 
     def reset(self):
         self.velocity_commands[:] = 0.0
+        if self.gamepad is not None:
+            self.gamepad.stop()
         self.last_action[:] = 0.0
         for buffer in self.obs_ring_buffer:
             buffer.reset()
         self.depth_pipeline.reset()
         initial_joint_pos = self.default_joint_pos * self.joint_signs
         self.sim_env.reset(initial_joint_pos)
-        print("Reset simulation state.")
+        self._reset_requested = False
+        if self.heading_hold is not None:
+            self.heading_hold.reset(self._heading())
+        # Give the policy valid stationary observations from its first step.
+        # In particular, gravity history should not be eight zero vectors.
+        for buffer, observation in zip(self.obs_ring_buffer, self._proprioception()):
+            for _ in range(buffer.length):
+                buffer.append(observation)
+        message = "Reset simulation state."
+        if self.heading_hold is not None:
+            message += f" Heading target: {np.degrees(self.heading_hold.target):+.2f} deg."
+        print(message)
 
     def _key_callback(self, keycode: int):
         if keycode == key("R", 82):
-            self.reset()
+            # GLFW invokes this on the viewer thread. Apply the reset on the
+            # control thread so the model is not reset in the middle of a step.
+            self._reset_requested = True
             return
 
         if self.sim2sim_type != "parkour":
+            return
+
+        if self.gamepad is not None:
+            if keycode in (key("SPACE", 32), key("KP_5", KEY_KP_5)):
+                self.gamepad.stop()
+                self.velocity_commands[:] = 0.0
+                print("Gamepad commands stopped; center sticks to resume.")
             return
 
         vx_step, _, yaw_step = COMMAND_STEP
@@ -284,34 +328,39 @@ class Sim2simInstance:
             f"yaw={self.velocity_commands[2]: .2f}"
         )
 
-    def update_observation(self):
+    def _heading(self) -> float:
+        matrix = self.sim_env.model_data.xmat[self._heading_body_id].reshape(3, 3)
+        return heading_from_matrix(matrix)
+
+    def _proprioception(self):
 
         imu_offset = self.sim_env.imu_offset
         sensordata = self.sim_env.model_data.sensordata.astype(np.float32)
 
         base_angle_vel = sensordata[imu_offset + 4 : imu_offset + 7] * 0.25
-        self.obs_ring_buffer[0].append(base_angle_vel)
 
         root_quat = sensordata[imu_offset : imu_offset + 4]
         projected_gravity = quat_apply_inverse(root_quat, np.array([0, 0, -1], dtype=np.float32))
-        self.obs_ring_buffer[1].append(projected_gravity)
 
         if self.sim2sim_type == "stand":
             velocity_commands = np.array((0, 0.0, 0.0), dtype=np.float32)
         else:
-            velocity_commands = self.velocity_commands
-        self.obs_ring_buffer[2].append(velocity_commands)
+            velocity_commands = self.velocity_commands.copy()
+            if self.heading_hold is not None:
+                velocity_commands[2] = self.heading_hold.update(float(velocity_commands[2]), self._heading())
+        self.effective_velocity_commands[:] = velocity_commands
 
         joint_pos_rel = sensordata[:29] * self.joint_signs - self.default_joint_pos
 
         joint_pos_rel = joint_pos_rel[self.robot_to_policy]
-        self.obs_ring_buffer[3].append(joint_pos_rel)
 
         joint_vel_rel = sensordata[29:58] * self.joint_signs * 0.05
         joint_vel_rel = joint_vel_rel[self.robot_to_policy]
-        self.obs_ring_buffer[4].append(joint_vel_rel)
+        return (base_angle_vel, projected_gravity, velocity_commands, joint_pos_rel, joint_vel_rel, self.last_action)
 
-        self.obs_ring_buffer[5].append(self.last_action)
+    def update_observation(self):
+        for buffer, observation in zip(self.obs_ring_buffer, self._proprioception()):
+            buffer.append(observation)
 
         if self.sim2sim_type == "stand":
             image = np.zeros(self.obs_depth_image_shape, dtype=np.float32)
@@ -352,6 +401,14 @@ class Sim2simInstance:
         while self.sim_env.viewer.is_running():
             time_start = time.perf_counter()
 
+            if self._reset_requested:
+                self.reset()
+            if self.gamepad is not None:
+                command = self.gamepad.poll()
+                if command.reset:
+                    self.reset()
+                else:
+                    self.velocity_commands[:] = (command.forward, 0.0, command.yaw)
             self.update_observation()
             observation_end = time.perf_counter()
             history_obs = self.get_history_obs()[None, ...]
@@ -401,7 +458,11 @@ class Sim2simInstance:
                         f"(target={1 / (SIM_DT * DECIMATION):g}), "
                         f"depth={avg[0]:.1f} ms, preprocessing={avg[1]:.1f} ms, "
                         f"encoder={avg[2]:.1f} ms, actor={avg[3]:.1f} ms, "
-                        f"physics={avg[4]:.1f} ms, viewer_sync={avg[5]:.1f} ms",
+                        f"physics={avg[4]:.1f} ms, viewer_sync={avg[5]:.1f} ms"
+                        + (f", heading={np.degrees(self._heading()):+.2f} deg, "
+                           f"target={np.degrees(self.heading_hold.target):+.2f} deg, "
+                           f"policy_yaw={self.effective_velocity_commands[2]:+.3f} rad/s"
+                           if self.heading_hold is not None else ""),
                         flush=True,
                     )
                     timings.clear()
@@ -413,10 +474,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, choices=["parkour", "stand"], default="parkour")
     parser.add_argument("--profile", action="store_true", help="Print control rate and stage timings every two seconds")
+    parser.add_argument("--control", choices=("keyboard", "gamepad"), default="keyboard", help="Velocity command source (default: keyboard)")
+    parser.add_argument("--gamepad-id", type=int, choices=range(16), help="GLFW gamepad ID; default is the first mapped gamepad")
     args = parser.parse_args()
+    if args.control == "gamepad" and args.task != "parkour":
+        parser.error("--control gamepad requires --task parkour")
+    if args.gamepad_id is not None and args.control != "gamepad":
+        parser.error("--gamepad-id requires --control gamepad")
 
     print(f"Python executable: {sys.executable}")
-    instance = Sim2simInstance(args.task)
+    instance = Sim2simInstance(args.task, control=args.control, gamepad_id=args.gamepad_id)
     print(f"Actor ONNX provider: {instance.actor.provider}")
     print(f"Depth encoder ONNX provider: {instance.depth_encoder.provider}")
+    print(f"ONNX threading: intra_op={ONNX_INTRA_OP_THREADS}, inter_op={ONNX_INTER_OP_THREADS}, spinning={ONNX_ALLOW_SPINNING}")
     instance.keep_running(profile=args.profile)

@@ -57,6 +57,10 @@ def main():
                 require(int(sensor.type[0]) == sensor_type and int(sensor.adr[0]) == offset + index, "Joint sensor layout mismatch")
                 require(model.joint(int(sensor.objid[0])).name == name, "Joint sensor order mismatch")
         model.camera(config.DEPTH_CAMERA_NAME)
+        if config.HEADING_HOLD_ENABLED:
+            from heading_control import HeadingHold
+            model.body(config.HEADING_HOLD_BODY)
+            HeadingHold(config.HEADING_HOLD_GAIN, config.HEADING_HOLD_MAX_YAW_RATE, config.COMMAND_RANGES["ang_vel_z"])
         imu_name = "secondary_imu_quat" if config.USE_SECONDARY_IMU else "imu_quat"
         imu = model.sensor(imu_name)
         require(int(imu.dim[0]) == 4, "IMU quaternion must contain 4 values")

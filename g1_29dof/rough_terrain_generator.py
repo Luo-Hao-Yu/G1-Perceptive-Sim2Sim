@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from rough_terrain_cfg import DEFAULT_TERRAIN_SPECS
+from rough_terrain_cfg import DEFAULT_GROUND_Z, DEFAULT_TERRAIN_SPECS
 
 ASSETS_DIR = Path(__file__).resolve().parent
 TEMPLATE_SCENE = ASSETS_DIR / "scene_flat.xml"
@@ -117,7 +117,25 @@ class RandomRoughHFieldCfg:
     material: str = "random_rough_mat"
     group: int = 2
 
-TerrainCfg = PyramidStairsCfg | PyramidStairsWithGapsCfg | BoxGridCfg | SlopePyramidCfg | RandomRoughHFieldCfg
+@dataclass
+class WoodenPlanksCfg:
+    name: str = "wooden_planks"
+    # Leading edge of the first plank; z is the walking surface, not its center.
+    start: tuple[float, float, float] = (2.0, 0.0, 0.0)
+    num_planks: int = 16
+    plank_width: float = 0.40  # Along the local X travel direction.
+    plank_length: float = 2.40  # Across the path, along local Y.
+    thickness: float = 0.12
+    min_gap: float = 0.10
+    max_gap: float = 0.30
+    seed: int = 23
+    approach_length: float = 4.0
+    landing_length: float = 2.0
+    yaw: float = 0.0
+    material: str = "wooden_planks_mat"
+    group: int = 2
+
+TerrainCfg = PyramidStairsCfg | PyramidStairsWithGapsCfg | BoxGridCfg | SlopePyramidCfg | RandomRoughHFieldCfg | WoodenPlanksCfg
 
 def _build_default_terrains() -> tuple[TerrainCfg, ...]:
     terrain_ctor_map = {
@@ -126,6 +144,7 @@ def _build_default_terrains() -> tuple[TerrainCfg, ...]:
         "pyramid_stairs_with_gaps": PyramidStairsWithGapsCfg,
         "slope_pyramid": SlopePyramidCfg,
         "random_rough": RandomRoughHFieldCfg,
+        "wooden_planks": WoodenPlanksCfg,
     }
     return tuple(terrain_ctor_map[name](**kwargs) for name, kwargs in DEFAULT_TERRAIN_SPECS)
 
@@ -134,6 +153,7 @@ DEFAULT_TERRAINS: tuple[TerrainCfg, ...] = _build_default_terrains()
 @dataclass
 class SceneCfg:
     terrains: Sequence[TerrainCfg] = field(default_factory=lambda: DEFAULT_TERRAINS)
+    ground_z: float = DEFAULT_GROUND_Z
 
 class RoughTerrainGenerator:
     def __init__(self, scene_cfg: SceneCfg | None = None) -> None:
@@ -190,6 +210,7 @@ class RoughTerrainGenerator:
         ET.SubElement(self.asset, "material", {"name": "boxes_mat", "rgba": "0.62 0.48 0.34 1"})
         ET.SubElement(self.asset, "material", {"name": "slope_mat", "rgba": "0.46 0.46 0.58 1"})
         ET.SubElement(self.asset, "material", {"name": "random_rough_mat", "rgba": "0.36 0.52 0.46 1"})
+        ET.SubElement(self.asset, "material", {"name": "wooden_planks_mat", "rgba": "0.58 0.34 0.16 1"})
 
         self.worldbody = self._required_child(self.root, "worldbody")
         self.worldbody.clear()
@@ -199,7 +220,11 @@ class RoughTerrainGenerator:
         ET.SubElement(
             self.worldbody,
             "geom",
-            {"name": "floor", "group": "2", "size": "0 0 0.05", "type": "plane", "material": "groundplane"},
+            {
+                "name": "floor", "group": "2", "size": "0 0 0.05",
+                "pos": vec((0.0, 0.0, self.scene_cfg.ground_z)),
+                "type": "plane", "material": "groundplane",
+            },
         )
 
     def _required_child(self, parent: ET.Element, tag: str) -> ET.Element:
@@ -223,6 +248,8 @@ class RoughTerrainGenerator:
             self.add_slope_pyramid(terrain)
         elif isinstance(terrain, RandomRoughHFieldCfg):
             self.add_random_rough_hfield(terrain)
+        elif isinstance(terrain, WoodenPlanksCfg):
+            self.add_wooden_planks(terrain)
         else:
             raise TypeError(f"Unsupported terrain config: {terrain!r}")
 
@@ -246,6 +273,42 @@ class RoughTerrainGenerator:
         if abs(yaw) > 1e-8:
             attrib["quat"] = vec(euler_to_quat(0.0, 0.0, yaw))
         ET.SubElement(self.worldbody, "geom", attrib)
+
+    def add_wooden_planks(self, cfg: WoodenPlanksCfg) -> None:
+        if not isinstance(cfg.num_planks, int) or cfg.num_planks < 1:
+            raise ValueError(f"{cfg.name}: num_planks must be a positive integer")
+        for name in ("plank_width", "plank_length", "thickness", "approach_length", "landing_length"):
+            value = getattr(cfg, name)
+            if not math.isfinite(value) or value <= 0.0:
+                raise ValueError(f"{cfg.name}: {name} must be finite and positive")
+        if not (math.isfinite(cfg.min_gap) and math.isfinite(cfg.max_gap) and 0.0 < cfg.min_gap <= cfg.max_gap):
+            raise ValueError(f"{cfg.name}: expected 0 < min_gap <= max_gap with finite values")
+        if len(cfg.start) != 3 or not all(math.isfinite(value) for value in (*cfg.start, cfg.yaw)):
+            raise ValueError(f"{cfg.name}: start and yaw must be finite")
+        if not self.scene_cfg.ground_z < cfg.start[2] - cfg.thickness:
+            raise ValueError(f"{cfg.name}: ground_z must lie below the bottom of the planks")
+
+        def add_board(suffix: str, leading_edge: float, width: float) -> None:
+            x, y = rotate_xy(leading_edge + width / 2.0, 0.0, cfg.yaw)
+            self._add_box(
+                name=f"{cfg.name}_{suffix}",
+                center=(cfg.start[0] + x, cfg.start[1] + y, cfg.start[2] - cfg.thickness / 2.0),
+                size=(width, cfg.plank_length, cfg.thickness),
+                material=cfg.material,
+                group=cfg.group,
+                yaw=cfg.yaw,
+            )
+
+        # A level starting platform keeps the robot's existing spawn pose valid.
+        add_board("approach", -cfg.approach_length, cfg.approach_length)
+        rng = random.Random(cfg.seed)
+        leading_edge = 0.0
+        for index in range(cfg.num_planks):
+            add_board(f"board_{index:02d}", leading_edge, cfg.plank_width)
+            leading_edge += cfg.plank_width
+            if index < cfg.num_planks - 1:
+                leading_edge += rng.uniform(cfg.min_gap, cfg.max_gap)
+        add_board("landing", leading_edge, cfg.landing_length)
 
     def add_pyramid_stairs(self, cfg: PyramidStairsCfg) -> None:
         for layer_idx, layer_width, layer_length in self._pyramid_layers(cfg):

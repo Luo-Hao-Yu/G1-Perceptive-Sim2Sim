@@ -7,6 +7,12 @@ STAND_DEPTH_ENCODER_FILE = os.path.join(_HERE, "policy", "stand_depth_encoder.on
 PARKOUR_POLICY_FILE = os.path.join(_HERE, "policy", "parkour_actor.onnx")
 PARKOUR_DEPTH_ENCODER_FILE = os.path.join(_HERE, "policy", "parkour_depth_encoder.onnx")
 
+# These small batch-one policies do not benefit from one thread per CPU core.
+# Avoid idle worker spinning competing with the viewer and depth rendering.
+ONNX_INTRA_OP_THREADS = 1
+ONNX_INTER_OP_THREADS = 1
+ONNX_ALLOW_SPINNING = False
+
 UNITREE_G1_29DOF_SDK_JOINT_NAMES = [
     "left_hip_pitch_joint",
     "left_hip_roll_joint",
@@ -78,8 +84,15 @@ DEPTH_CAMERA_NAME = "depth_camera"
 DEPTH_IMAGE_SHAPE = (270, 480)
 USE_SECONDARY_IMU = True
 
-VIEWER_LOOKAT = (15.0, 0.0, 0.5)
-VIEWER_DISTANCE = 32.0
+# Hold the reset/last manually commanded heading when yaw input is zero.
+# Feedback is sent through the policy's yaw command, in rad/s.
+HEADING_HOLD_ENABLED = True
+HEADING_HOLD_BODY = "torso_link"
+HEADING_HOLD_GAIN = 2.0
+HEADING_HOLD_MAX_YAW_RATE = 0.5
+
+VIEWER_LOOKAT = (5.5, 0.0, 0.2)
+VIEWER_DISTANCE = 18.0
 VIEWER_AZIMUTH = 0.0
 VIEWER_ELEVATION = -50.0
 
@@ -89,6 +102,15 @@ COMMAND_RANGES = {
     "lin_vel_y": (0, 0),
     "ang_vel_z": (-1.0, 1.0),
 }
+
+# GLFW standard Xbox/XInput mapping. Axis values are normalized to [-1, 1].
+GAMEPAD_DEADZONE = 0.15
+GAMEPAD_FORWARD_AXIS = 1  # Left stick Y; pushing up is negative.
+GAMEPAD_FORWARD_SIGN = -1.0
+GAMEPAD_YAW_AXIS = 2  # Right stick X; pushing left gives positive yaw.
+GAMEPAD_YAW_SIGN = -1.0
+GAMEPAD_STOP_BUTTON = 1  # B
+GAMEPAD_RESET_BUTTON = 3  # Y
 
 KEY_KP_2 = 322
 KEY_KP_4 = 324

@@ -3,6 +3,8 @@ import numpy as np
 import onnxruntime as ort
 from typing import Dict, Union
 
+from config import ONNX_ALLOW_SPINNING, ONNX_INTER_OP_THREADS, ONNX_INTRA_OP_THREADS
+
 class OnnxPolicyInference:
     _device_dict = {"cpu": "CPUExecutionProvider", "cuda:0": "CUDAExecutionProvider"}
 
@@ -22,7 +24,16 @@ class OnnxPolicyInference:
             raise FileNotFoundError(f"No such file called {onnx_file}")
         self.onnx_file = onnx_file
         self.provider = self._device_dict[device]
-        self.session = ort.InferenceSession(onnx_file, providers=[self.provider])
+        for name, value in (("ONNX_INTRA_OP_THREADS", ONNX_INTRA_OP_THREADS), ("ONNX_INTER_OP_THREADS", ONNX_INTER_OP_THREADS)):
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError(f"{name} must be a nonnegative integer (0 selects the runtime default)")
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = ONNX_INTRA_OP_THREADS
+        options.inter_op_num_threads = ONNX_INTER_OP_THREADS
+        spinning = "1" if ONNX_ALLOW_SPINNING else "0"
+        options.add_session_config_entry("session.intra_op.allow_spinning", spinning)
+        options.add_session_config_entry("session.inter_op.allow_spinning", spinning)
+        self.session = ort.InferenceSession(onnx_file, sess_options=options, providers=[self.provider])
         self._init_io_infos()
 
     def __str__(self):

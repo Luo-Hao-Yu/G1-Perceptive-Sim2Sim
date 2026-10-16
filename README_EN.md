@@ -10,7 +10,7 @@ Included:
 
 - `stand` and `parkour` entry points.
 - MuJoCo scenes, the G1 29DoF model, and an ONNX file location convention.
-- Keyboard velocity commands.
+- Keyboard or Xbox/XInput gamepad velocity commands.
 - Replaceable actor and depth encoder ONNX paths.
 
 Not included:
@@ -98,6 +98,8 @@ python3 sim2sim.py --task parkour --profile
 
 Every two seconds, this reports the control rate and depth rendering, preprocessing, ONNX inference, physics, and viewer synchronization timings. Control rate differs from window display FPS; the default control target is 50 Hz.
 
+ONNX sessions default to single-threaded inference with worker spinning disabled so that the two small models' thread pools do not consume CPU time needed for rendering. Adjust `ONNX_*` in `config.py` if needed; startup prints these settings.
+
 Run the stand policy:
 
 ```bash
@@ -114,6 +116,17 @@ Keyboard controls in parkour mode:
 | `Right` / `KP6` | Increase right yaw command |
 | `Space` / `KP5` | Stop |
 | `R` | Reset |
+
+Parkour enables heading hold by default: with zero manual yaw input it holds the reset heading, or the new heading after a manual turn. Feedback is applied through the policy's yaw velocity command. Configure `HEADING_HOLD_*` in `config.py`, or set `HEADING_HOLD_ENABLED=False` to disable it. `--profile` also reports heading, target heading, and the effective policy yaw command.
+
+Xbox/XInput gamepads are also supported in parkour mode, using the existing GLFW dependency:
+
+```bash
+python3 sim2sim.py --task parkour --control gamepad
+python3 gamepad_control.py --monitor  # Check devices and live input separately
+```
+
+Push the left stick up for forward velocity; use the right stick horizontally for yaw. B stops commands and Y resets the simulation. Centered sticks or a disconnection produce zero commands. Center both sticks after connecting, stopping, or resetting before movement resumes. Keyboard Space and R remain available in gamepad mode; arrow-key velocity control belongs to the default keyboard mode. Configure deadzone and mappings with `GAMEPAD_*` in `config.py`, or select a device with `--gamepad-id 0`. Velocity limits follow `COMMAND_RANGES`; reverse and lateral motion are disabled by default.
 
 ## Preparing ONNX Policies
 

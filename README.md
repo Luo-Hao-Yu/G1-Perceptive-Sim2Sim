@@ -10,7 +10,7 @@
 
 - `stand` 和 `parkour` 两种运行入口。
 - MuJoCo 场景、G1 29DoF 模型和 ONNX 文件放置目录。
-- 键盘速度指令。
+- 键盘或 Xbox/XInput 手柄速度指令。
 - 可替换的 actor 和 depth encoder ONNX 路径。
 
 不包含：
@@ -98,6 +98,8 @@ python3 sim2sim.py --task parkour --profile
 
 每两秒输出控制循环频率及深度渲染、预处理、ONNX 推理、物理仿真和查看器同步耗时。控制循环频率与窗口显示帧率不同；默认控制目标为 50 Hz。
 
+ONNX 默认使用单线程并关闭工作线程空转，避免两个小模型的线程池占用大量 CPU、影响渲染。可在 `config.py` 的 `ONNX_*` 配置中调整；启动时会打印实际配置。
+
 运行站立 policy：
 
 ```bash
@@ -114,6 +116,17 @@ parkour 模式键盘控制：
 | `→` / `KP6` | 增加右转角速度 |
 | `Space` / `KP5` | 速度命令归零 |
 | `R` | 重置 |
+
+parkour 默认启用航向保持：零手动转向输入时保持重置后的朝向，主动转向后保持新的方向。纠偏通过策略的转向速度指令完成，配置见 `config.py` 的 `HEADING_HOLD_*`；设置 `HEADING_HOLD_ENABLED=False` 可关闭。`--profile` 会显示实际朝向、目标朝向及策略收到的转向指令。
+
+parkour 模式也支持 Xbox/XInput 手柄，无需增加依赖：
+
+```bash
+python3 sim2sim.py --task parkour --control gamepad
+python3 gamepad_control.py --monitor  # 单独检查设备和输入
+```
+
+左摇杆上推控制前进，右摇杆左右控制转向，B 停止，Y 重置。摇杆回中或断连时速度指令归零；连接、停止、重置后需先将摇杆回中。键盘空格和 R 在手柄模式仍然有效，方向键速度控制仅在默认的键盘模式有效。死区与映射见 `config.py` 的 `GAMEPAD_*`；多手柄可指定 `--gamepad-id 0`。速度范围沿用 `COMMAND_RANGES`，默认不支持倒退和横移。
 
 ## 准备 ONNX 策略
 

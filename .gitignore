@@ -3,6 +3,7 @@ __pycache__/
 *.so
 
 .venv/
+.tools/
 venv/
 env/
 .env
