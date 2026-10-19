@@ -5,7 +5,10 @@
       "label": "生成地形（项目 Python 3.11）",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "args": ["-E", "${workspaceFolder}/g1_29dof/rough_terrain_generator.py"],
+      "args": [
+        "-E",
+        "${workspaceFolder}/g1_29dof/rough_terrain_generator.py"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -19,6 +22,45 @@
         "panel": "dedicated",
         "clear": true
       }
+    },
+    {
+      "label": "23DoF：检查配置",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "-E",
+        "${workspaceFolder}/g1_23dof/check_config.py"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "23DoF：生成木板地形",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "-E",
+        "${workspaceFolder}/g1_23dof/rough_terrain_generator.py"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "23DoF：从 URDF 重建模型",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "-E",
+        "${workspaceFolder}/g1_23dof/build_model.py"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
     }
   ]
 }

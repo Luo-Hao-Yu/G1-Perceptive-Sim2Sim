@@ -38,26 +38,27 @@ def device_name(backend, joystick_id: int) -> str:
 
 
 class GamepadController:
-    def __init__(self, joystick_id: int | None = None, *, backend=None, logger=print):
+    def __init__(self, joystick_id: int | None = None, *, backend=None, logger=print, settings=None):
+        self.settings = config if settings is None else settings
         self.backend = glfw if backend is None else backend
         self.log = logger
         if joystick_id is not None and not 0 <= joystick_id <= 15:
             raise ValueError("Gamepad ID must be in 0..15")
-        if not math.isfinite(config.GAMEPAD_DEADZONE) or not 0 <= config.GAMEPAD_DEADZONE < 1:
+        if not math.isfinite(self.settings.GAMEPAD_DEADZONE) or not 0 <= self.settings.GAMEPAD_DEADZONE < 1:
             raise ValueError("GAMEPAD_DEADZONE must be in [0, 1)")
         for name in ("GAMEPAD_FORWARD_AXIS", "GAMEPAD_YAW_AXIS"):
-            value = getattr(config, name)
+            value = getattr(self.settings, name)
             if not isinstance(value, int) or not 0 <= value < 6:
                 raise ValueError(f"{name} must be an axis index in 0..5")
         for name in ("GAMEPAD_STOP_BUTTON", "GAMEPAD_RESET_BUTTON"):
-            value = getattr(config, name)
+            value = getattr(self.settings, name)
             if not isinstance(value, int) or not 0 <= value < 15:
                 raise ValueError(f"{name} must be a button index in 0..14")
         for name in ("GAMEPAD_FORWARD_SIGN", "GAMEPAD_YAW_SIGN"):
-            if getattr(config, name) not in (-1, 1):
+            if getattr(self.settings, name) not in (-1, 1):
                 raise ValueError(f"{name} must be -1 or 1")
         for name in ("lin_vel_x", "ang_vel_z"):
-            low, high = config.COMMAND_RANGES[name]
+            low, high = self.settings.COMMAND_RANGES[name]
             if not (math.isfinite(low) and math.isfinite(high) and low <= 0 <= high):
                 raise ValueError(f"{name} range must be finite and include zero")
         self.preferred_id = joystick_id
@@ -112,10 +113,10 @@ class GamepadController:
             return GamepadCommand()
 
         try:
-            forward = axis_with_deadzone(float(state.axes[config.GAMEPAD_FORWARD_AXIS]), config.GAMEPAD_DEADZONE) * config.GAMEPAD_FORWARD_SIGN
-            yaw = axis_with_deadzone(float(state.axes[config.GAMEPAD_YAW_AXIS]), config.GAMEPAD_DEADZONE) * config.GAMEPAD_YAW_SIGN
-            stop_down = bool(state.buttons[config.GAMEPAD_STOP_BUTTON])
-            reset_down = bool(state.buttons[config.GAMEPAD_RESET_BUTTON])
+            forward = axis_with_deadzone(float(state.axes[self.settings.GAMEPAD_FORWARD_AXIS]), self.settings.GAMEPAD_DEADZONE) * self.settings.GAMEPAD_FORWARD_SIGN
+            yaw = axis_with_deadzone(float(state.axes[self.settings.GAMEPAD_YAW_AXIS]), self.settings.GAMEPAD_DEADZONE) * self.settings.GAMEPAD_YAW_SIGN
+            stop_down = bool(state.buttons[self.settings.GAMEPAD_STOP_BUTTON])
+            reset_down = bool(state.buttons[self.settings.GAMEPAD_RESET_BUTTON])
         except (IndexError, TypeError, ValueError):
             self.stop()
             self._report("[Gamepad] Invalid input; commands are zero. Check the gamepad mapping.")
@@ -131,8 +132,8 @@ class GamepadController:
                 self._armed = True
             return GamepadCommand()
         return GamepadCommand(
-            forward=self._velocity(forward, config.COMMAND_RANGES["lin_vel_x"]),
-            yaw=self._velocity(yaw, config.COMMAND_RANGES["ang_vel_z"]),
+            forward=self._velocity(forward, self.settings.COMMAND_RANGES["lin_vel_x"]),
+            yaw=self._velocity(yaw, self.settings.COMMAND_RANGES["ang_vel_z"]),
         )
 
 

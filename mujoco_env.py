@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -55,6 +56,8 @@ class MujocoEnv:
         viewer_azimuth: float | None = None,
         viewer_elevation: float | None = None,
         key_callback=None,
+        viewer_enabled: bool = True,
+        depth_enabled: bool = True,
     ):
         self.mjcf_file = mjcf_file
         self.sim_dt = sim_dt
@@ -69,10 +72,19 @@ class MujocoEnv:
         self.viewer_azimuth = viewer_azimuth
         self.viewer_elevation = viewer_elevation
         self.key_callback = key_callback
+        self.viewer = None
+        self.depth_render = None
+        self._viewer_threads = []
 
         self._init_model()
-        self._init_viewer()
-        self._init_depth_render()
+        try:
+            if viewer_enabled:
+                self._init_viewer()
+            if depth_enabled:
+                self._init_depth_render()
+        except Exception:
+            self.close()
+            raise
 
     def _init_model(self):
         if not self.mjcf_file.endswith(".xml"):
@@ -97,9 +109,14 @@ class MujocoEnv:
             self.imu_offset = self.model.sensor_adr[secondary_imu_id]
 
     def _init_viewer(self):
+        previous_threads = set(threading.enumerate())
         self.viewer = mujoco.viewer.launch_passive(
             self.model, self.model_data, key_callback=self.key_callback
         )
+        self._viewer_threads = [
+            thread for thread in threading.enumerate()
+            if thread not in previous_threads and "_launch_internal" in thread.name
+        ]
         self._setup_initial_free_camera()
 
     def _setup_initial_free_camera(self):
@@ -137,3 +154,12 @@ class MujocoEnv:
 
     def physical_step(self):
         mujoco.mj_step(self.model, self.model_data)
+
+    def close(self):
+        if self.depth_render is not None:
+            self.depth_render._render.close()
+        if self.viewer is not None:
+            self.viewer.close()
+        for thread in self._viewer_threads:
+            if thread is not threading.current_thread():
+                thread.join(timeout=5)

@@ -2,6 +2,8 @@
 
 配置验证日期：2026-10-14。
 
+23DoF 独立验证入口已放在 [`g1_23dof/README.md`](g1_23dof/README.md)，使用用户提供的 URDF 和 2026-10-19 确认的 23 动作策略。启动命令为 `.venv/bin/python -E g1_23dof/sim2sim.py --profile`；本文件下文的根目录命令仍对应 29DoF。
+
 ## 运行环境
 
 - Python 3.11.17：项目内 `.tools/python/`。

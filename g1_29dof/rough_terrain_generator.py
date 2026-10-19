@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from rough_terrain_cfg import DEFAULT_GROUND_Z, DEFAULT_TERRAIN_SPECS
+if __package__:
+    from .rough_terrain_cfg import DEFAULT_GROUND_Z, DEFAULT_TERRAIN_SPECS
+else:
+    from rough_terrain_cfg import DEFAULT_GROUND_Z, DEFAULT_TERRAIN_SPECS
 
 ASSETS_DIR = Path(__file__).resolve().parent
 TEMPLATE_SCENE = ASSETS_DIR / "scene_flat.xml"
@@ -156,9 +159,9 @@ class SceneCfg:
     ground_z: float = DEFAULT_GROUND_Z
 
 class RoughTerrainGenerator:
-    def __init__(self, scene_cfg: SceneCfg | None = None) -> None:
+    def __init__(self, scene_cfg: SceneCfg | None = None, *, template_scene: Path = TEMPLATE_SCENE) -> None:
         self.scene_cfg = scene_cfg or SceneCfg()
-        self.root = ET.parse(TEMPLATE_SCENE).getroot()
+        self.root = ET.parse(template_scene).getroot()
         self.asset: ET.Element
         self.worldbody: ET.Element
         self._replace_terrain_scene()

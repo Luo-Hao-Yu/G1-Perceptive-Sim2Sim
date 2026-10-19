@@ -6,8 +6,74 @@
       "type": "debugpy",
       "request": "launch",
       "python": "${workspaceFolder}/.venv/bin/python",
-      "pythonArgs": ["-E"],
+      "pythonArgs": [
+        "-E"
+      ],
       "program": "${workspaceFolder}/g1_29dof/rough_terrain_generator.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "23DoF：平地策略验证",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "pythonArgs": [
+        "-E"
+      ],
+      "program": "${workspaceFolder}/g1_23dof/sim2sim.py",
+      "args": [
+        "--profile"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "23DoF：木板手柄验证",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "pythonArgs": [
+        "-E"
+      ],
+      "program": "${workspaceFolder}/g1_23dof/sim2sim.py",
+      "args": [
+        "--scene",
+        "rough",
+        "--control",
+        "gamepad",
+        "--profile"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "23DoF：检查配置",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "pythonArgs": [
+        "-E"
+      ],
+      "program": "${workspaceFolder}/g1_23dof/check_config.py",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "23DoF：生成木板地形",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "pythonArgs": [
+        "-E"
+      ],
+      "program": "${workspaceFolder}/g1_23dof/rough_terrain_generator.py",
+      "args": [],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true

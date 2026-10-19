@@ -12,7 +12,7 @@ class OnnxPolicyInference:
         "tensor(float)": np.float32,
     }
 
-    def __init__(self, onnx_file: str, device: str = "cpu"):
+    def __init__(self, onnx_file: str, device: str = "cpu", *, settings=None):
         device = device.lower()
         if (
             device not in self._device_dict
@@ -24,13 +24,16 @@ class OnnxPolicyInference:
             raise FileNotFoundError(f"No such file called {onnx_file}")
         self.onnx_file = onnx_file
         self.provider = self._device_dict[device]
-        for name, value in (("ONNX_INTRA_OP_THREADS", ONNX_INTRA_OP_THREADS), ("ONNX_INTER_OP_THREADS", ONNX_INTER_OP_THREADS)):
+        intra_threads = ONNX_INTRA_OP_THREADS if settings is None else settings.ONNX_INTRA_OP_THREADS
+        inter_threads = ONNX_INTER_OP_THREADS if settings is None else settings.ONNX_INTER_OP_THREADS
+        allow_spinning = ONNX_ALLOW_SPINNING if settings is None else settings.ONNX_ALLOW_SPINNING
+        for name, value in (("ONNX_INTRA_OP_THREADS", intra_threads), ("ONNX_INTER_OP_THREADS", inter_threads)):
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
                 raise ValueError(f"{name} must be a nonnegative integer (0 selects the runtime default)")
         options = ort.SessionOptions()
-        options.intra_op_num_threads = ONNX_INTRA_OP_THREADS
-        options.inter_op_num_threads = ONNX_INTER_OP_THREADS
-        spinning = "1" if ONNX_ALLOW_SPINNING else "0"
+        options.intra_op_num_threads = intra_threads
+        options.inter_op_num_threads = inter_threads
+        spinning = "1" if allow_spinning else "0"
         options.add_session_config_entry("session.intra_op.allow_spinning", spinning)
         options.add_session_config_entry("session.inter_op.allow_spinning", spinning)
         self.session = ort.InferenceSession(onnx_file, sess_options=options, providers=[self.provider])
@@ -62,7 +65,8 @@ class OnnxPolicyInference:
         for k, v in input_feed.items():
             if k not in self.input_infos:
                 raise ValueError(f"No such input called {k}")
-            if v.shape != tuple(self.input_infos[k][0]):
+            shape = self.input_infos[k][0]
+            if len(v.shape) != len(shape) or any(isinstance(size, int) and size != actual for size, actual in zip(shape, v.shape)):
                 raise ValueError(
                     f"shape mismatch required {tuple(self.input_infos[k][0])} while get {v.shape}"
                 )
