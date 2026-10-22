@@ -102,7 +102,7 @@ python3 sim2sim.py --task parkour --profile
 
 ```bash
 .venv/bin/python -E g1_29dof/rough_terrain_generator.py
-.venv/bin/python -E sim2sim.py --task parkour --profile
+.venv/bin/python -E sim2sim.py --task parkour --control gamepad --profile
 ```
 
 生成器输出 `Generated rough terrain scene: .../g1_29dof/scene_rough.xml` 才表示更新成功；如果报错，旧 XML 会保留，仿真仍可能显示旧地形。生成完成后应退出旧仿真并重新启动，R 只重置机器人状态，不重新读取地形。启动日志中的 `Scene XML:` 会显示实际加载的绝对路径。`g1_23dof/` 的生成与运行入口使用其独立场景。
@@ -136,6 +136,8 @@ parkour 模式也支持 Xbox/XInput 手柄，无需增加依赖：
 python3 sim2sim.py --task parkour --control gamepad
 python3 gamepad_control.py --monitor  # 单独检查设备和输入
 ```
+
+本机可直接运行 `.venv/bin/python -E sim2sim.py --task parkour --control gamepad --profile`。VS Code「运行和调试」中已提供「29DoF：木板手柄验证」入口，使用项目解释器及根目录的 29DoF 启动脚本。
 
 左摇杆上推控制前进，右摇杆左右控制转向，B 停止，Y 重置。摇杆回中或断连时速度指令归零；连接、停止、重置后需先将摇杆回中。键盘空格和 R 在手柄模式仍然有效，方向键速度控制仅在默认的键盘模式有效。死区与映射见 `config.py` 的 `GAMEPAD_*`；多手柄可指定 `--gamepad-id 0`。速度范围沿用 `COMMAND_RANGES`，默认不支持倒退和横移。
 

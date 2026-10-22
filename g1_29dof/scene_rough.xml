@@ -19,7 +19,7 @@
   </asset>
   <worldbody>
     <light pos="0 0 2.5" dir="0 0 -1" directional="true" />
-    <geom name="floor" group="2" size="0 0 0.05" pos="0 0 -0.05" type="plane" material="groundplane" />
+    <geom name="floor" group="2" size="0 0 0.05" pos="0 0 -0.35" type="plane" material="groundplane" />
     <geom name="wooden_planks_approach" group="2" pos="0 0 -0.025" type="box" size="2 0.45 0.025" material="wooden_planks_mat" />
     <geom name="wooden_planks_board_00" group="2" pos="2.3 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
     <geom name="wooden_planks_board_01" group="2" pos="3.1 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />

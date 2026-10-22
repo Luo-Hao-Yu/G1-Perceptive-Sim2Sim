@@ -15,6 +15,26 @@
       "justMyCode": true
     },
     {
+      "name": "29DoF：木板手柄验证",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "pythonArgs": [
+        "-E"
+      ],
+      "program": "${workspaceFolder}/sim2sim.py",
+      "args": [
+        "--task",
+        "parkour",
+        "--control",
+        "gamepad",
+        "--profile"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
       "name": "23DoF：平地策略验证",
       "type": "debugpy",
       "request": "launch",

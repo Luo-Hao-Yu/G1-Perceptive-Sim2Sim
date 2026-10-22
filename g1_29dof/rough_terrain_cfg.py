@@ -70,7 +70,7 @@ TerrainSpec = tuple[str, dict[str, Any]]
 # )
 
 # 板面及起终点平台的名义高度为 z=0，沟底为 z=-0.05 m。
-DEFAULT_GROUND_Z = -0.05  # 比板面低 5 cm；可与木板底面齐平
+DEFAULT_GROUND_Z = -0.35  # 比板面低 5 cm；可与木板底面齐平
 
 # 对应训练的 PerlinPlaneTerrainCfg；整条路线共用一片噪声，平台和沟底均叠加。
 PERLIN_SETTINGS = {
