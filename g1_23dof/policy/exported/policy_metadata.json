@@ -1,7 +1,7 @@
 {
   "robot": "Unitree G1 23dof",
   "task": "Instinct-Parkour-Target-Amp-G1-23dof-Play-v0",
-  "checkpoint": "/workspace/instinctlab/logs/instinct_rl/g1_23dof_parkour/20261018_102434/model_30000.pt",
+  "checkpoint": "/workspace/instinctlab/logs/instinct_rl/g1_23dof_gaps/20261019_210434_from20261018_102434/model_40000.pt",
   "urdf_sha256": "5d5a7380ec2f747e82dfd7c61fe70515715d413c3521a02911ef5dd9a007e374",
   "root_body": "pelvis",
   "policy_dt_s": 0.02,

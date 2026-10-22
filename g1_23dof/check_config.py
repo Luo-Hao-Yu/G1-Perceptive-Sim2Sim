@@ -45,6 +45,7 @@ def main():
         print(f"[PASS] {scene}: 23 joints/motors, nq=30, nv=29; URDF masses, axes, hard ranges and efforts")
     print(f"[PASS] URDF SHA256 matches metadata; root={cfg.ROOT_BODY}, control={1/cfg.POLICY_DT:g} Hz")
     if not args.model_only:
+        print(f"Policy directory: {cfg.POLICY_DIR}\nMetadata checkpoint: {cfg.METADATA['checkpoint']}")
         policy = Policy()
         history = [np.zeros(dim * cfg.HISTORY_LENGTH, np.float32) for dim in cfg.OBS_DIMS]
         action = policy(history, np.zeros(cfg.DEPTH_INPUT_SHAPE, np.float32))

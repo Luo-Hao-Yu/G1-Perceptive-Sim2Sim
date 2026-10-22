@@ -1,0 +1,45 @@
+{
+  "status": "PASSED",
+  "checkpoint": "logs/instinct_rl/g1_23dof_gaps/20261019_210434_from20261018_102434/model_40000.pt",
+  "checkpoint_iteration": 40000,
+  "samples": 20,
+  "onnxruntime": "1.23.2",
+  "provider": "CPUExecutionProvider",
+  "max_absolute_error": 1.9073486328125e-05,
+  "tolerance": {
+    "atol": 0.0001,
+    "rtol": 0.0001
+  },
+  "models": {
+    "0-depth_encoder.onnx": {
+      "sha256": "199f4ba86a6ef3efc872995a35105eb2eb4b542b44c69183f5789c1365a114eb",
+      "opset": {
+        "ai.onnx": 18
+      },
+      "input": [
+        1,
+        8,
+        18,
+        32
+      ],
+      "output": [
+        1,
+        128
+      ]
+    },
+    "actor.onnx": {
+      "sha256": "80df351ff976c65e6a777275ed653a33553c5ec26d114d2cba76f4686219a16b",
+      "opset": {
+        "ai.onnx": 12
+      },
+      "input": [
+        1,
+        752
+      ],
+      "output": [
+        1,
+        23
+      ]
+    }
+  }
+}

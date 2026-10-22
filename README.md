@@ -98,6 +98,17 @@ python3 sim2sim.py --task parkour --profile
 
 每两秒输出控制循环频率及深度渲染、预处理、ONNX 推理、物理仿真和查看器同步耗时。控制循环频率与窗口显示帧率不同；默认控制目标为 50 Hz。
 
+29DoF 地形加载链路为 `g1_29dof/rough_terrain_cfg.py` → 生成器 → `g1_29dof/scene_rough.xml` → 根目录 `sim2sim.py`（路径由根目录 `config.py` 的 `MJCF_FILE` 指定）。修改木板时调整 `PLANK_SETTINGS`；文件末尾的 `DEFAULT_TERRAIN_SPECS` 是通用生成器所需的入口，应保留。
+
+```bash
+.venv/bin/python -E g1_29dof/rough_terrain_generator.py
+.venv/bin/python -E sim2sim.py --task parkour --profile
+```
+
+生成器输出 `Generated rough terrain scene: .../g1_29dof/scene_rough.xml` 才表示更新成功；如果报错，旧 XML 会保留，仿真仍可能显示旧地形。生成完成后应退出旧仿真并重新启动，R 只重置机器人状态，不重新读取地形。启动日志中的 `Scene XML:` 会显示实际加载的绝对路径。`g1_23dof/` 的生成与运行入口使用其独立场景。
+
+Perlin 起伏需要在 `PLANK_SETTINGS` 中启用 `"perlin_cfg": PERLIN_SETTINGS`；该项注释时，单独修改 `PERLIN_SETTINGS` 不会改变表面。
+
 ONNX 默认使用单线程并关闭工作线程空转，避免两个小模型的线程池占用大量 CPU、影响渲染。可在 `config.py` 的 `ONNX_*` 配置中调整；启动时会打印实际配置。
 
 运行站立 policy：

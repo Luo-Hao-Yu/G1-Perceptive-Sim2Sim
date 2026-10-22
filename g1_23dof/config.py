@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-METADATA_FILE = HERE / "policy" / "policy_metadata.json"
+POLICY_DIR = HERE / "policy" / "exported"
+METADATA_FILE = POLICY_DIR / "policy_metadata.json"
 METADATA = json.loads(METADATA_FILE.read_text(encoding="utf-8"))
-ACTOR_FILE = HERE / "policy" / "actor.onnx"
-DEPTH_ENCODER_FILE = HERE / "policy" / "0-depth_encoder.onnx"
+ACTOR_FILE = POLICY_DIR / "actor.onnx"
+DEPTH_ENCODER_FILE = POLICY_DIR / "0-depth_encoder.onnx"
 URDF_FILE = HERE / "g1_23dof.urdf"
 ROOT_BODY = METADATA["root_body"]
 OBSERVATION_JOINT_NAMES = METADATA["observation_joint_names"]
@@ -52,6 +53,13 @@ VIEWER_AZIMUTH = 0.0
 VIEWER_ELEVATION = -35.0
 COMMAND_STEP = (0.2, 0.0, 0.5)
 COMMAND_RANGES = {"lin_vel_x": (0.0, 0.9), "lin_vel_y": (0.0, 0.0), "ang_vel_z": (-1.0, 1.0)}
+# External world-frame feedback, as required by the training command generator.
+# off: raw commands; heading: fixed yaw; path: heading plus lateral position.
+COMMAND_FEEDBACK_MODE = "path"
+HEADING_HOLD_GAIN = 2.0
+HEADING_HOLD_MAX_YAW_RATE = 1.0
+PATH_LOOKAHEAD = 1.0  # m: larger values make lateral recovery more gradual.
+PATH_MAX_HEADING_OFFSET = 0.5235987755982988  # 30 degrees relative to the line.
 GAMEPAD_DEADZONE = 0.15
 GAMEPAD_FORWARD_AXIS = 1
 GAMEPAD_FORWARD_SIGN = -1.0

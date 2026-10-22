@@ -19,24 +19,24 @@
   </asset>
   <worldbody>
     <light pos="0 0 2.5" dir="0 0 -1" directional="true" />
-    <geom name="floor" group="2" size="0 0 0.05" pos="0 0 -0.35" type="plane" material="groundplane" />
-    <geom name="wooden_planks_approach" group="2" pos="0 0 -0.06" type="box" size="2 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_00" group="2" pos="2.45 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_01" group="2" pos="3.49249 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_02" group="2" pos="4.53735 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_03" group="2" pos="5.57659 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_04" group="2" pos="6.53495 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_05" group="2" pos="7.54415 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_06" group="2" pos="8.53652 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_07" group="2" pos="9.53953 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_08" group="2" pos="10.5026 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_09" group="2" pos="11.4718 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_10" group="2" pos="12.4662 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_11" group="2" pos="13.4383 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_12" group="2" pos="14.4338 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_13" group="2" pos="15.3863 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_14" group="2" pos="16.3449 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_board_15" group="2" pos="17.3659 0 -0.06" type="box" size="0.45 1.2 0.06" material="wooden_planks_mat" />
-    <geom name="wooden_planks_landing" group="2" pos="18.8159 0 -0.06" type="box" size="1 1.2 0.06" material="wooden_planks_mat" />
+    <geom name="floor" group="2" size="0 0 0.05" pos="0 0 -0.05" type="plane" material="groundplane" />
+    <geom name="wooden_planks_approach" group="2" pos="0 0 -0.025" type="box" size="2 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_00" group="2" pos="2.3 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_01" group="2" pos="3.1 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_02" group="2" pos="3.9 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_03" group="2" pos="4.7 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_04" group="2" pos="5.5 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_05" group="2" pos="6.3 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_06" group="2" pos="7.1 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_07" group="2" pos="7.9 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_08" group="2" pos="8.7 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_09" group="2" pos="9.5 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_10" group="2" pos="10.3 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_11" group="2" pos="11.1 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_12" group="2" pos="11.9 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_13" group="2" pos="12.7 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_14" group="2" pos="13.5 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_board_15" group="2" pos="14.3 0 -0.025" type="box" size="0.3 0.45 0.025" material="wooden_planks_mat" />
+    <geom name="wooden_planks_landing" group="2" pos="15.6 0 -0.025" type="box" size="1 0.45 0.025" material="wooden_planks_mat" />
   </worldbody>
 </mujoco>

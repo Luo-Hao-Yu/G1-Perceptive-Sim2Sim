@@ -77,7 +77,7 @@ class GamepadControlTests(unittest.TestCase):
     def test_stop_requires_stick_center_after_button_release(self):
         self.controller.poll()
         self.assertGreater(self.move(forward=-1).forward, 0)
-        self.assertEqual(self.move(forward=-1, stop=True), GamepadCommand())
+        self.assertEqual(self.move(forward=-1, stop=True), GamepadCommand(stop=True))
         self.assertEqual(self.move(forward=-1), GamepadCommand())
         self.assertEqual(self.move(), GamepadCommand())
         self.assertGreater(self.move(forward=-1).forward, 0)

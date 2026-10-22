@@ -20,6 +20,7 @@ class GamepadCommand:
     forward: float = 0.0
     yaw: float = 0.0
     reset: bool = False
+    stop: bool = False
 
 
 def axis_with_deadzone(value: float, deadzone: float) -> float:
@@ -126,7 +127,7 @@ class GamepadController:
         self._reset_down = reset_down
         if stop_down or reset_down:
             self.stop()
-            return GamepadCommand(reset=reset)
+            return GamepadCommand(reset=reset, stop=stop_down)
         if not self._armed:
             if forward == 0.0 and yaw == 0.0:
                 self._armed = True

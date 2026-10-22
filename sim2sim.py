@@ -84,6 +84,7 @@ class DepthImagePipeline:
         h, w = self.shape
         y1, y2, x1, x2 = self.crop_region
         dh, dw = h - y1 - y2, w - x1 - x2
+        self._history_initialized = False
         for _ in range(self.length):
             self.que.append(np.zeros((dh, dw), dtype=np.float32))
         self.resample_delay()
@@ -137,7 +138,15 @@ class DepthImagePipeline:
 
         image = (image - self.near_clip) / (self.far_clip - self.near_clip)
 
-        self.que.append(image.astype(np.float32))
+        image = image.astype(np.float32)
+        if not self._history_initialized:
+            # Match Isaac's AsyncCircularBuffer first push after startup/reset.
+            # Zero-filled history represents fictitious near-depth frames to the policy.
+            self.que.clear()
+            self.que.extend(image.copy() for _ in range(self.length))
+            self._history_initialized = True
+        else:
+            self.que.append(image)
 
         self.resample_delay()
 
@@ -186,6 +195,7 @@ class Sim2simInstance:
                 "under policy/ or update config.py:\n" + "\n".join(missing_files)
             )
 
+        print(f"Scene XML: {os.path.realpath(MJCF_FILE)}", flush=True)
         self.sim_env = MujocoEnv(
             mjcf_file=MJCF_FILE,
             sim_dt=SIM_DT,

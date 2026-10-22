@@ -1,4 +1,6 @@
 
+
+
 """Generate the independent 23DoF plank scene using shared terrain geometry."""
 from pathlib import Path
 import sys

@@ -10,6 +10,7 @@ import config as root_config
 from g1_23dof import config as cfg
 from g1_23dof.check_config import check_urdf
 from g1_23dof.runtime import Policy, Simulation, validate_model
+from g1_23dof.rough_terrain_cfg import PLANK_SETTINGS
 
 
 class G1ModelTests(unittest.TestCase):
@@ -33,12 +34,17 @@ class G1ModelTests(unittest.TestCase):
         root = ET.parse(scene).getroot()
         self.assertEqual(root.find("include").get("file"), "g1_23dof.xml")
         planks = [g for g in root.findall("worldbody/geom") if g.get("name", "").startswith("wooden_planks_board_")]
-        self.assertEqual(len(planks), 16)
+        self.assertEqual(len(planks), PLANK_SETTINGS['num_planks'])
+        def half_width(geom):
+            if geom.get("type") == "hfield":
+                asset = root.find(f"asset/hfield[@name='{geom.get('hfield')}']")
+                return float(asset.get("size").split()[0])
+            return float(geom.get("size").split()[0])
         for a, b in zip(planks, planks[1:]):
-            edge_a = float(a.get("pos").split()[0]) + float(a.get("size").split()[0])
-            edge_b = float(b.get("pos").split()[0]) - float(b.get("size").split()[0])
-            self.assertGreaterEqual(edge_b-edge_a, .10-1e-4)
-            self.assertLessEqual(edge_b-edge_a, .15+1e-4)
+            edge_a = float(a.get("pos").split()[0]) + half_width(a)
+            edge_b = float(b.get("pos").split()[0]) - half_width(b)
+            self.assertGreaterEqual(edge_b-edge_a, PLANK_SETTINGS['min_gap']-1e-4)
+            self.assertLessEqual(edge_b-edge_a, PLANK_SETTINGS['max_gap']+1e-4)
 
     def test_reference_29dof_configuration_is_not_replaced(self):
         self.assertEqual(len(root_config.POLICY_JOINT_NAMES), 29)

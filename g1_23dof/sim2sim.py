@@ -19,6 +19,7 @@ def main():
     parser.add_argument("--headless", action="store_true", help="No viewer; policy still needs an OpenGL depth context")
     parser.add_argument("--seconds", type=float, help="Exit after this many simulated seconds")
     parser.add_argument("--profile", action="store_true")
+    parser.add_argument("--feedback", choices=("off", "heading", "path"), help="Velocity command feedback; default is config.COMMAND_FEEDBACK_MODE")
     args = parser.parse_args()
     if args.seconds is not None and (not math.isfinite(args.seconds) or args.seconds <= 0):
         parser.error("--seconds must be finite and positive")
@@ -29,7 +30,7 @@ def main():
     if args.headless and args.control == "gamepad":
         parser.error("--control gamepad requires the viewer (GLFW initialization)")
     instance = Simulation(scene=args.scene, preview=args.preview, headless=args.headless,
-                          control=args.control, gamepad_id=args.gamepad_id)
+                          control=args.control, gamepad_id=args.gamepad_id, feedback=args.feedback)
     try:
         instance.run(seconds=args.seconds, profile=args.profile)
     except KeyboardInterrupt:

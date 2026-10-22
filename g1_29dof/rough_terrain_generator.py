@@ -10,8 +10,10 @@ from typing import Iterable, Sequence
 
 if __package__:
     from .rough_terrain_cfg import DEFAULT_GROUND_Z, DEFAULT_TERRAIN_SPECS
+    from .perlin_surface import PerlinSurface, PerlinSurfaceCfg
 else:
     from rough_terrain_cfg import DEFAULT_GROUND_Z, DEFAULT_TERRAIN_SPECS
+    from perlin_surface import PerlinSurface, PerlinSurfaceCfg
 
 ASSETS_DIR = Path(__file__).resolve().parent
 TEMPLATE_SCENE = ASSETS_DIR / "scene_flat.xml"
@@ -137,6 +139,7 @@ class WoodenPlanksCfg:
     yaw: float = 0.0
     material: str = "wooden_planks_mat"
     group: int = 2
+    perlin_cfg: PerlinSurfaceCfg | dict | None = None
 
 TerrainCfg = PyramidStairsCfg | PyramidStairsWithGapsCfg | BoxGridCfg | SlopePyramidCfg | RandomRoughHFieldCfg | WoodenPlanksCfg
 
@@ -288,10 +291,49 @@ class RoughTerrainGenerator:
             raise ValueError(f"{cfg.name}: expected 0 < min_gap <= max_gap with finite values")
         if len(cfg.start) != 3 or not all(math.isfinite(value) for value in (*cfg.start, cfg.yaw)):
             raise ValueError(f"{cfg.name}: start and yaw must be finite")
-        if not self.scene_cfg.ground_z < cfg.start[2] - cfg.thickness:
-            raise ValueError(f"{cfg.name}: ground_z must lie below the bottom of the planks")
+        if self.scene_cfg.ground_z > cfg.start[2] - cfg.thickness + 1e-9:
+            raise ValueError(f"{cfg.name}: ground_z must be at or below the bottom of the planks")
+
+        # Build the layout first, then sample one global noise field for all
+        # boards, platforms and the ditch; gap RNG is independent of noise RNG.
+        boards = [("approach", -cfg.approach_length, cfg.approach_length)]
+        rng = random.Random(cfg.seed)
+        leading_edge = 0.0
+        for index in range(cfg.num_planks):
+            boards.append((f"board_{index:02d}", leading_edge, cfg.plank_width))
+            leading_edge += cfg.plank_width
+            if index < cfg.num_planks - 1:
+                leading_edge += rng.uniform(cfg.min_gap, cfg.max_gap)
+        boards.append(("landing", leading_edge, cfg.landing_length))
+        perlin = None
+        if cfg.perlin_cfg is not None:
+            noise_cfg = PerlinSurfaceCfg(**cfg.perlin_cfg) if isinstance(cfg.perlin_cfg, dict) else cfg.perlin_cfg
+            if not isinstance(noise_cfg, PerlinSurfaceCfg):
+                raise TypeError("perlin_cfg must be PerlinSurfaceCfg, a dict, or None")
+            padding = noise_cfg.ground_padding
+            perlin = PerlinSurface(
+                noise_cfg, -cfg.approach_length-padding, leading_edge+cfg.landing_length+padding,
+                -cfg.plank_length/2-padding, cfg.plank_length/2+padding,
+            )
+            # Lower the infinite background plane so it cannot fill negative
+            # troughs in the noisy ground. The nominal floor height is retained
+            # by the finite, collidable hfield covering the course and padding.
+            floor = self.worldbody.find("geom[@name='floor']")
+            floor_z = float(floor.get("pos").split()[2])
+            floor_z = min(floor_z, self.scene_cfg.ground_z + float(perlin.heights.min()) - 0.001)
+            floor.set("pos", vec((0, 0, floor_z)))
+            self._add_perlin_patch(
+                f"{cfg.name}_ground", cfg, perlin, perlin.x[0], perlin.x[-1],
+                perlin.y[0], perlin.y[-1], self.scene_cfg.ground_z, 0.05, "groundplane",
+            )
 
         def add_board(suffix: str, leading_edge: float, width: float) -> None:
+            if perlin is not None:
+                self._add_perlin_patch(
+                    f"{cfg.name}_{suffix}", cfg, perlin, leading_edge, leading_edge+width,
+                    -cfg.plank_length/2, cfg.plank_length/2, cfg.start[2], cfg.thickness, cfg.material,
+                )
+                return
             x, y = rotate_xy(leading_edge + width / 2.0, 0.0, cfg.yaw)
             self._add_box(
                 name=f"{cfg.name}_{suffix}",
@@ -302,16 +344,39 @@ class RoughTerrainGenerator:
                 yaw=cfg.yaw,
             )
 
-        # A level starting platform keeps the robot's existing spawn pose valid.
-        add_board("approach", -cfg.approach_length, cfg.approach_length)
-        rng = random.Random(cfg.seed)
-        leading_edge = 0.0
-        for index in range(cfg.num_planks):
-            add_board(f"board_{index:02d}", leading_edge, cfg.plank_width)
-            leading_edge += cfg.plank_width
-            if index < cfg.num_planks - 1:
-                leading_edge += rng.uniform(cfg.min_gap, cfg.max_gap)
-        add_board("landing", leading_edge, cfg.landing_length)
+        for suffix, edge, width in boards:
+            add_board(suffix, edge, width)
+
+    def _add_perlin_patch(self, name, cfg, surface, x_min, x_max, y_min, y_max, nominal_z, thickness, material):
+        heights = surface.patch(x_min, x_max, y_min, y_max)
+        low, high = float(heights.min()), float(heights.max())
+        if thickness + low <= 0:
+            raise ValueError(f"{name}: roughness trough reaches below the patch bottom; increase thickness")
+        span = high-low
+        # MuJoCo normalizes hfields to [0,1] at compilation. Encode the actual
+        # span AND the minimum Z so centering never becomes an upward-only bump.
+        if span < 1e-12:
+            center_x, center_y = rotate_xy((x_min+x_max)/2, (y_min+y_max)/2, cfg.yaw)
+            self._add_box(name, (cfg.start[0]+center_x, cfg.start[1]+center_y, nominal_z+low-(thickness+low)/2),
+                          (x_max-x_min, y_max-y_min, thickness+low), material, cfg.group, cfg.yaw)
+            return
+        elevation = (heights-low)/span
+        asset_name = f"{name}_hfield"
+        ET.SubElement(self.asset, "hfield", {
+            "name": asset_name, "nrow": str(heights.shape[0]), "ncol": str(heights.shape[1]),
+            "size": vec(((x_max-x_min)/2, (y_max-y_min)/2, span, thickness+low)),
+            # Inline MJCF elevation rows are top-to-bottom (positive to
+            # negative Y); compiled hfield_data rows run negative to positive Y.
+            "elevation": "\n" + "\n".join("      " + " ".join(f"{v:.9g}" for v in row) for row in elevation[::-1]) + "\n    ",
+        })
+        x, y = rotate_xy((x_min+x_max)/2, (y_min+y_max)/2, cfg.yaw)
+        attrs = {
+            "name": name, "type": "hfield", "hfield": asset_name, "group": str(cfg.group),
+            "pos": vec((cfg.start[0]+x, cfg.start[1]+y, nominal_z+low)), "material": material,
+        }
+        if abs(cfg.yaw) > 1e-8:
+            attrs["quat"] = vec(euler_to_quat(0, 0, cfg.yaw))
+        ET.SubElement(self.worldbody, "geom", attrs)
 
     def add_pyramid_stairs(self, cfg: PyramidStairsCfg) -> None:
         for layer_idx, layer_width, layer_length in self._pyramid_layers(cfg):

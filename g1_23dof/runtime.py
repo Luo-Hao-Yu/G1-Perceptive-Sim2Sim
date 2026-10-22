@@ -7,6 +7,8 @@ import mujoco
 import numpy as np
 
 from g1_23dof import config as cfg
+from g1_23dof.command_control import PlanarCommandFeedback
+from heading_control import heading_from_matrix
 from mujoco_env import MujocoEnv
 from onnx_inference import OnnxPolicyInference
 from sim2sim import DepthImagePipeline, RingBuffer, quat_apply_inverse
@@ -77,13 +79,20 @@ class Policy:
 
 
 class Simulation:
-    def __init__(self, *, scene="flat", preview=False, headless=False, control="keyboard", gamepad_id=None):
+    def __init__(self, *, scene="flat", preview=False, headless=False, control="keyboard", gamepad_id=None, feedback=None):
+        self.feedback = PlanarCommandFeedback(
+            cfg.COMMAND_FEEDBACK_MODE if feedback is None else feedback,
+            cfg.HEADING_HOLD_GAIN, cfg.HEADING_HOLD_MAX_YAW_RATE,
+            cfg.COMMAND_RANGES["ang_vel_z"], cfg.PATH_LOOKAHEAD, cfg.PATH_MAX_HEADING_OFFSET,
+        )
         # Validate the export before starting native graphics threads.
         self.policy = None if preview else Policy()
         self.preview = preview
         self.commands = np.zeros(3, dtype=np.float32)
+        self.effective_commands = np.zeros(3, dtype=np.float32)
         self.last_action = np.zeros(23, dtype=np.float32)
         self._reset_requested = False
+        self._stop_requested = False
         self.gamepad = None
         if control == "gamepad":
             from gamepad_control import GamepadController
@@ -122,8 +131,11 @@ class Simulation:
         data.qpos[self.action_qpos] = self.offset
         self.env.forward()
         self.commands[:] = 0
+        self.effective_commands[:] = 0
         self.last_action[:] = 0
         self._reset_requested = False
+        self._stop_requested = False
+        self.feedback.reset(data.xpos[self.root_id, :2], self.heading())
         if self.gamepad:
             self.gamepad.stop()
         self.depth.reset()
@@ -141,7 +153,40 @@ class Simulation:
         gravity = quat_apply_inverse(data.xquat[self.root_id], np.array([0., 0., -1.])).astype(np.float32)
         pos = (data.qpos[self.obs_qpos] - cfg.OBS_POSITION_OFFSET).astype(np.float32)
         vel = (data.qvel[self.obs_qvel] * cfg.JOINT_VELOCITY_SCALE).astype(np.float32)
-        return angular_velocity, gravity, self.commands.copy(), pos, vel, self.last_action.copy()
+        return angular_velocity, gravity, self.effective_commands.copy(), pos, vel, self.last_action.copy()
+
+    def heading(self):
+        return heading_from_matrix(self.env.model_data.xmat[self.root_id].reshape(3,3))
+
+    def stop(self):
+        """Apply on simulation thread: stop motion and clear the old reference."""
+        self.commands[:] = 0
+        self.effective_commands[:] = 0
+        self.feedback.reset(self.env.model_data.xpos[self.root_id, :2], self.heading())
+        self._stop_requested = False
+        if self.gamepad:
+            self.gamepad.stop()
+
+    def update_velocity_command(self):
+        self.effective_commands[:] = self.commands
+        self.effective_commands[2] = self.feedback.update(
+            float(self.commands[0]), float(self.commands[2]),
+            self.env.model_data.xpos[self.root_id, :2], self.heading(),
+        )
+
+    def command_diagnostics(self):
+        velocity = np.zeros(6)
+        mujoco.mj_objectVelocity(self.env.model, self.env.model_data,
+                                mujoco.mjtObj.mjOBJ_BODY, self.root_id, velocity, 1)
+        return {
+            "world_y": float(self.env.model_data.xpos[self.root_id,1]),
+            "yaw_deg": math.degrees(self.heading()),
+            "target_deg": math.degrees(self.feedback.target_heading),
+            "cross_track": self.feedback.cross_track_error,
+            "body_vy": float(velocity[4]),
+            "manual_yaw": float(self.commands[2]),
+            "policy_yaw": float(self.effective_commands[2]),
+        }
 
     def key_callback(self, code):
         # Callback runs on viewer thread; reset on the simulation thread.
@@ -150,6 +195,7 @@ class Simulation:
             return
         if code in (32, 325):  # space, numpad 5
             self.commands[:] = 0
+            self._stop_requested = True
             if self.gamepad:
                 self.gamepad.stop()
         elif self.gamepad is None:
@@ -171,8 +217,13 @@ class Simulation:
             command = self.gamepad.poll()
             if command.reset:
                 self.reset()
+            elif command.stop:
+                self.stop()
             else:
                 self.commands[:] = command.forward, 0, command.yaw
+        if self._stop_requested:
+            self.stop()
+        self.update_velocity_command()
         if not self.preview:
             for buffer, value in zip(self.history, self.proprioception()):
                 buffer.append(value)
@@ -195,6 +246,11 @@ class Simulation:
     def run(self, seconds=None, profile=False):
         print(f"G1 23DoF | {'PD preview' if self.preview else 'actor 752 -> 23, depth 8x18x32 -> 128'} | 50 Hz control")
         print("Keyboard: up/down speed, left/right yaw, space stop, R reset. Xbox: left stick forward, right stick yaw, B stop, Y reset.")
+        print(f"Command feedback: {self.feedback.mode}; heading gain={cfg.HEADING_HOLD_GAIN:g}, yaw limit={cfg.HEADING_HOLD_MAX_YAW_RATE:g} rad/s, lookahead={cfg.PATH_LOOKAHEAD:g} m")
+        if self.policy is not None:
+            print(f"Actor: {cfg.ACTOR_FILE}; SHA256={hashlib.sha256(cfg.ACTOR_FILE.read_bytes()).hexdigest()[:16]}")
+            print(f"Depth encoder: {cfg.DEPTH_ENCODER_FILE}; SHA256={hashlib.sha256(cfg.DEPTH_ENCODER_FILE.read_bytes()).hexdigest()[:16]}")
+            print(f"Metadata checkpoint: {cfg.METADATA['checkpoint']}")
         print("Depth preprocessing uses reference defaults; metadata does not specify camera FOV, clipping, or frame sampling.")
         count = 0
         steps = None if seconds is None else math.ceil(seconds / cfg.POLICY_DT)
@@ -216,7 +272,11 @@ class Simulation:
                     time.sleep(max(0, cfg.POLICY_DT - elapsed))
                 wall = time.perf_counter() - report_start
                 if profile and wall >= 2:
-                    print(f"Profile: control={len(times)/wall:.1f} Hz, work={np.mean(times):.2f} ms, pelvis_z={data.qpos[2]:.3f} m, max_tilt={max_tilt:.1f} deg", flush=True)
+                    diag = self.command_diagnostics()
+                    print(f"Profile: control={len(times)/wall:.1f} Hz, work={np.mean(times):.2f} ms, pelvis_z={data.qpos[2]:.3f} m, max_tilt={max_tilt:.1f} deg, "
+                          f"Y={diag['world_y']:+.3f} m, cross_track={diag['cross_track']:+.3f} m, "
+                          f"yaw={diag['yaw_deg']:+.2f} deg, target={diag['target_deg']:+.2f} deg, "
+                          f"body_vy={diag['body_vy']:+.3f} m/s, manual_yaw={diag['manual_yaw']:+.3f}, policy_yaw={diag['policy_yaw']:+.3f} rad/s", flush=True)
                     times.clear()
                     report_start = time.perf_counter()
         finally:
